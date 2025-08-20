@@ -36,6 +36,19 @@ func (c *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Request)
 	marshalOkJson(w, http.StatusCreated, chirp)
 }
 
+func (c *apiConfig) handlerGetChips(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
+
+	chirps, err := c.db.GetChirps(req.Context())
+
+	if err != nil {
+		marshalError(w, 500, err.Error())
+		return
+	}
+
+	marshalOkJson(w, http.StatusOK, chirps)
+}
+
 // handlerValidateChirp validates the chirp request body and returns the chirp parameters if valid.
 // If the chirp is invalid, it returns an error response and false.
 // It checks for the length of the chirp body and censors bad words.

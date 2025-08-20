@@ -71,12 +71,17 @@ func main() {
 		platform:       os.Getenv("PLATFORM"),
 	}
 
+	// app resource
 	serveMux.Handle(appPrefix, apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
+	// api generic resource
 	serveMux.HandleFunc(createApiPath("GET", apiPrefix, "healthz"), handlerHealth)
 	serveMux.HandleFunc(createApiPath("GET", adminPrefix, "metrics"), apiCfg.handlerMetrics)
-	serveMux.HandleFunc(createApiPath("POST ", adminPrefix, "reset"), apiCfg.handlerReset)
+	// Chirps resource
 	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "chirps"), apiCfg.handlerCreateChirp)
+	serveMux.HandleFunc(createApiPath("GET ", apiPrefix, "chirps"), apiCfg.handlerGetChips)
+	// Users resource
 	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "users"), apiCfg.handlerCreateUser)
+	serveMux.HandleFunc(createApiPath("POST ", adminPrefix, "reset"), apiCfg.handlerReset)
 
 	server := &http.Server{
 		Addr:    ":" + port,
