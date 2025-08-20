@@ -76,6 +76,7 @@ func main() {
 	// api generic resource
 	serveMux.HandleFunc(createApiPath("GET", apiPrefix, "healthz"), handlerHealth)
 	serveMux.HandleFunc(createApiPath("GET", adminPrefix, "metrics"), apiCfg.handlerMetrics)
+	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "login"), apiCfg.handlerLogin)
 	// Chirps resource
 	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "chirps"), apiCfg.handlerCreateChirp)
 	serveMux.HandleFunc(createApiPath("GET ", apiPrefix, "chirps"), apiCfg.handlerGetChips)
