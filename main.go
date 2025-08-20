@@ -1,14 +1,22 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync/atomic"
+
+	"github.com/federicoReghini/Chirpy/internal/database"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
 	fileServerHits atomic.Int32
+	db             *database.Queries
+	platform       string
 }
 
 func (c *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -37,6 +45,19 @@ func createApiPath(method, prefix, path string) string {
 }
 
 func main() {
+	godotenv.Load()
+
+	dbURL := os.Getenv("DB_URL")
+
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer db.Close()
+
+	dbQueries := database.New(db)
+
 	serveMux := http.NewServeMux()
 	const port = "8080"
 	const filepathRoot = "."
@@ -44,15 +65,18 @@ func main() {
 	const appPrefix = "/app/"
 	const adminPrefix = "/admin/"
 
-	apiCfg := apiConfig{
+	apiCfg := &apiConfig{
 		fileServerHits: atomic.Int32{},
+		db:             dbQueries,
+		platform:       os.Getenv("PLATFORM"),
 	}
 
 	serveMux.Handle(appPrefix, apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
 	serveMux.HandleFunc(createApiPath("GET", apiPrefix, "healthz"), handlerHealth)
 	serveMux.HandleFunc(createApiPath("GET", adminPrefix, "metrics"), apiCfg.handlerMetrics)
 	serveMux.HandleFunc(createApiPath("POST ", adminPrefix, "reset"), apiCfg.handlerReset)
-	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "validate_chirp"), handlerValidatChirp)
+	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "chirps"), apiCfg.handlerCreateChirp)
+	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "users"), apiCfg.handlerCreateUser)
 
 	server := &http.Server{
 		Addr:    ":" + port,
