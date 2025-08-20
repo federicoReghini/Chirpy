@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/federicoReghini/Chirpy/internal/database"
 	"net/http"
 	"strings"
+
+	"github.com/federicoReghini/Chirpy/internal/database"
+	"github.com/google/uuid"
 )
 
 // handlerCreateChirp creates a new chirp in the database.
@@ -47,6 +49,24 @@ func (c *apiConfig) handlerGetChips(w http.ResponseWriter, req *http.Request) {
 	}
 
 	marshalOkJson(w, http.StatusOK, chirps)
+}
+func (c *apiConfig) handlerGetChipByID(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
+
+	uuid, err := uuid.Parse(req.PathValue("chirpID"))
+
+	if err != nil {
+		marshalError(w, http.StatusBadRequest, "Invalid chirp ID")
+		return
+	}
+
+	chirp, err := c.db.GetChirp(req.Context(), uuid)
+
+	if err != nil {
+		marshalError(w, http.StatusNotFound, "Chirp not found")
+		return
+	}
+	marshalOkJson(w, http.StatusOK, chirp)
 }
 
 // handlerValidateChirp validates the chirp request body and returns the chirp parameters if valid.
