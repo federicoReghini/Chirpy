@@ -117,6 +117,7 @@ type UserWithToken struct {
 	Email        string    `json:"email"`
 	Token        string    `json:"token"`
 	RefreshToken string    `json:"refresh_token"`
+	IsChirpyRed  bool      `json:"is_chirpy_red,omitempty"`
 }
 
 // handlerLogin handles user login requests.
@@ -177,6 +178,7 @@ func (c *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 		UpdatedAt:    user.UpdatedAt,
 		Token:        token,
 		RefreshToken: refreshToken,
+		IsChirpyRed:  user.IsChirpyRed,
 	}
 
 	marshalOkJson(w, http.StatusOK, usr)

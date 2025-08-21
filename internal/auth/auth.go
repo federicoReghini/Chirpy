@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -92,21 +93,9 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 // It returns the token as a string or an error if the header is not formatted correctly.
 func GetBearerToken(headers http.Header) (string, error) {
 
-	bearer := headers.Get("Authorization")
-
-	if bearer == "" {
-		return "", errors.New("authorization header is missing")
-	}
-
-	const bearerPrefix = "Bearer "
-	if !strings.HasPrefix(bearer, bearerPrefix) {
-
-		return "", errors.New("Authorization header must start with 'Bearer '")
-	}
-
-	token := strings.TrimSpace(bearer[len(bearerPrefix):])
-	if token == "" {
-		return "", errors.New("Bearer token is empty")
+	token, err := getTokenFromAuthorizationHeader("Bearer ", headers)
+	if err != nil {
+		return "", err
 	}
 
 	return token, nil
@@ -120,4 +109,33 @@ func MakeRefreshToken() (string, error) {
 	}
 
 	return hex.EncodeToString(randomBytes), nil
+}
+
+func GetAPIKey(headers http.Header) (string, error) {
+	token, err := getTokenFromAuthorizationHeader("ApiKey ", headers)
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+func getTokenFromAuthorizationHeader(prefix string, headers http.Header) (string, error) {
+	authString := headers.Get("Authorization")
+
+	if authString == "" {
+		return "", errors.New("Authorization header is missing")
+	}
+
+	if !strings.HasPrefix(authString, prefix) {
+
+		return "", fmt.Errorf("Authorization header must start with '%s'", prefix)
+	}
+
+	token := strings.TrimSpace(authString[len(prefix):])
+	if token == "" {
+		return "", fmt.Errorf("%s token is empty", prefix)
+	}
+
+	return token, nil
+
 }

@@ -18,6 +18,7 @@ type apiConfig struct {
 	db             *database.Queries
 	platform       string
 	apiKey         string
+	polkaKey       string
 }
 
 func (c *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -71,6 +72,7 @@ func main() {
 		db:             dbQueries,
 		platform:       os.Getenv("PLATFORM"),
 		apiKey:         os.Getenv("API_KEY"),
+		polkaKey:       os.Getenv("POLKA_KEY"),
 	}
 
 	// app resource
@@ -90,6 +92,8 @@ func main() {
 	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "users"), apiCfg.handlerCreateUser)
 	serveMux.HandleFunc(createApiPath("PUT ", apiPrefix, "users"), apiCfg.handlerUpdateUser)
 	serveMux.HandleFunc(createApiPath("POST ", adminPrefix, "reset"), apiCfg.handlerReset)
+	// Webhook resource
+	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "polka/webhooks"), apiCfg.handlerPolkaWebhook)
 
 	server := &http.Server{
 		Addr:    ":" + port,

@@ -1,13 +1,14 @@
 -- name: CreateUser :one
-INSERT INTO users (id, created_at, updated_at, email, hashed_password)
+INSERT INTO users (id, created_at, updated_at, email, hashed_password, is_chirpy_red)
 VALUES (
   gen_random_uuid(),
   NOW(),
   NOW(),
   $1,
-  $2
+  $2,
+  false
 )
-RETURNING id, created_at, updated_at, email;
+RETURNING id, created_at, updated_at, email, is_chirpy_red;
 
 -- name: GetUserByEmail :one
 SELECT * FROM users
@@ -28,3 +29,8 @@ UPDATE users
   SET email = $1, hashed_password = $2
   WHERE users.id = $3
   RETURNING *;
+
+-- name: UpdateUserToPremium :exec
+UPDATE users
+  SET is_chirpy_red = true 
+  WHERE users.id = $1;
