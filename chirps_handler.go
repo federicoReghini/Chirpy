@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/federicoReghini/Chirpy/internal/auth"
 	"github.com/federicoReghini/Chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -22,16 +23,29 @@ import (
 func (c *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
+	token, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+	}
+
+	userID, err := auth.ValidateJWT(token, c.apiKey)
+
+	if err != nil {
+		marshalError(w, http.StatusUnauthorized, "401 Unauthorized"+err.Error())
+		return
+	}
+
 	// Check if length of the chirp is valid
 	chirpValidated, isValid := handlerValidateChirp(w, req)
 	if !isValid {
 		return
 	}
 
+	chirpValidated.UserID = uuid.NullUUID{UUID: userID, Valid: true}
+
 	chirp, err := c.db.CreateChirp(req.Context(), chirpValidated)
 
 	if err != nil {
-		marshalError(w, 500, err.Error())
+		marshalError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -44,7 +58,7 @@ func (c *apiConfig) handlerGetChips(w http.ResponseWriter, req *http.Request) {
 	chirps, err := c.db.GetChirps(req.Context())
 
 	if err != nil {
-		marshalError(w, 500, err.Error())
+		marshalError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 

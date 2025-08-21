@@ -3,9 +3,11 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/federicoReghini/Chirpy/internal/auth"
 	"github.com/federicoReghini/Chirpy/internal/database"
+	"github.com/google/uuid"
 )
 
 type createUserBodyRequest struct {
@@ -55,10 +57,21 @@ func (c *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request) 
 }
 
 type loginRequest struct {
-	Password string `json:"password"`
-	Email    string `json:"email"`
+	Password         string `json:"password"`
+	Email            string `json:"email"`
+	ExpiresInSeconds int    `json:"expires_in_seconds:omitempty"`
 }
 
+type UserWithToken struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Email     string    `json:"email"`
+	Token     string    `json:"token"`
+}
+
+// handlerLogin handles user login requests.
+// It checks the user's credentials and returns a JWT token if successful.
 func (c *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 
 	defer req.Body.Close()
@@ -77,15 +90,30 @@ func (c *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Check if psw is correct
 	if err := auth.CheckPasswordHash(params.Password, user.HashedPassword); err != nil {
 		marshalError(w, http.StatusUnauthorized, "Incorrect email or password")
 		return
 	}
-	usr := database.CreateUserRow{
+
+	if params.ExpiresInSeconds == 0 || params.ExpiresInSeconds > 60*60 {
+		params.ExpiresInSeconds = 60 * 60
+	}
+
+	// Create Jwt
+	token, err := auth.MakeJWT(user.ID, c.apiKey, time.Duration(params.ExpiresInSeconds)*time.Second)
+
+	if err != nil {
+		marshalError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	usr := UserWithToken{
 		ID:        user.ID,
 		Email:     user.Email,
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
+		Token:     token,
 	}
 
 	marshalOkJson(w, http.StatusOK, usr)

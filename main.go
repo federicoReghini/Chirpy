@@ -17,6 +17,7 @@ type apiConfig struct {
 	fileServerHits atomic.Int32
 	db             *database.Queries
 	platform       string
+	apiKey         string
 }
 
 func (c *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -69,6 +70,7 @@ func main() {
 		fileServerHits: atomic.Int32{},
 		db:             dbQueries,
 		platform:       os.Getenv("PLATFORM"),
+		apiKey:         os.Getenv("API_KEY"),
 	}
 
 	// app resource
