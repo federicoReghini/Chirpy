@@ -59,14 +59,7 @@ func (c *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request) 
 func (c *apiConfig) handlerUpdateUser(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
-	// Get user from JWT token (reuse auth logic)
-	token, err := auth.GetBearerToken(req.Header)
-	if err != nil {
-		marshalError(w, http.StatusUnauthorized, err.Error())
-		return
-	}
-
-	userID, err := auth.ValidateJWT(token, c.apiKey)
+	userID, err := getUserIDFromValidateJWT(c, w, req)
 	if err != nil {
 		marshalError(w, http.StatusUnauthorized, "Invalid token")
 		return

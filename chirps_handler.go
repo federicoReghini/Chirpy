@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/federicoReghini/Chirpy/internal/auth"
 	"github.com/federicoReghini/Chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -23,14 +22,10 @@ import (
 func (c *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
-	token, err := auth.GetBearerToken(req.Header)
-	if err != nil {
-	}
-
-	userID, err := auth.ValidateJWT(token, c.apiKey)
+	userID, err := getUserIDFromValidateJWT(c, w, req)
 
 	if err != nil {
-		marshalError(w, http.StatusUnauthorized, "401 Unauthorized"+err.Error())
+		marshalError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
@@ -87,13 +82,12 @@ func (c *apiConfig) handlerGetChipByID(w http.ResponseWriter, req *http.Request)
 // If the chirp is invalid, it returns an error response and false.
 // It checks for the length of the chirp body and censors bad words.
 func handlerValidateChirp(w http.ResponseWriter, req *http.Request) (database.CreateChirpParams, bool) {
-	defer req.Body.Close()
 	decoder := json.NewDecoder(req.Body)
 	params := database.CreateChirpParams{}
 
 	err := decoder.Decode(&params)
 	if err != nil {
-		marshalError(w, http.StatusInternalServerError, "Something went wrong")
+		marshalError(w, http.StatusInternalServerError, err.Error())
 		return database.CreateChirpParams{}, false
 	}
 
@@ -110,16 +104,57 @@ func handlerValidateChirp(w http.ResponseWriter, req *http.Request) (database.Cr
 
 		if params.Body != "" {
 			for _, word := range uncensuredText {
-				if _, exist := badWords[word]; exist {
+				if _, exist := badWords[strings.ToLower(word)]; exist {
 					msg.WriteString("****" + " ")
 				} else {
 					msg.WriteString(word + " ")
 				}
 			}
-		} else {
-			msg.WriteString(params.Body)
+			// Update params.Body with censored text and trim trailing space
+			params.Body = strings.TrimSpace(msg.String())
 		}
 
 		return params, true
 	}
+}
+
+// handlerDeleteChirp deletes a chirp from the database.
+// It checks if the user is authorized to delete the chirp by comparing the user ID from
+// the JWT token with the user ID of the chirp.
+// If the user is authorized, it deletes the chirp and returns a 204 No Content response.
+// If the user is not authorized, it returns a 403 Forbidden response.
+// If the chirp does not exist, it returns a 404 Not Found response.
+// It uses the database.DeleteChirpParams struct to validate the chirp parameters.
+// The function is part of the apiConfig struct which contains the database connection.
+// It is registered as a handler for the "/chirps/{chirpID}" endpoint with the DELETE method.
+func (c *apiConfig) handlerDeleteChirp(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
+	userID, err := getUserIDFromValidateJWT(c, w, req)
+	if err != nil {
+		marshalError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	chirpID, err := uuid.Parse(req.PathValue("chirpID"))
+	if err != nil {
+		marshalError(w, http.StatusBadRequest, "Invalid chirp ID")
+		return
+	}
+
+	chirp, err := c.db.GetChirp(req.Context(), chirpID)
+	if err != nil {
+		marshalError(w, http.StatusNotFound, "Chirp not found")
+		return
+	}
+
+	if userID == chirp.UserID.UUID {
+		c.db.DeleteChirp(req.Context(), database.DeleteChirpParams{
+			UserID: uuid.NullUUID{UUID: userID, Valid: true},
+			ID:     chirp.ID,
+		})
+		w.WriteHeader(http.StatusNoContent)
+	} else {
+		w.WriteHeader(http.StatusForbidden)
+	}
+
 }

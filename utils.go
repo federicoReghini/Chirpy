@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+
+	"github.com/federicoReghini/Chirpy/internal/auth"
+	"github.com/google/uuid"
 )
 
 type myError struct {
@@ -91,4 +94,20 @@ func ifErrCondition(w http.ResponseWriter, err error, statusCode int, msg string
 		marshalError(w, statusCode, msg)
 		return
 	}
+}
+
+func getUserIDFromValidateJWT(c *apiConfig, w http.ResponseWriter, req *http.Request) (uuid.UUID, error) {
+
+	token, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	userID, err := auth.ValidateJWT(token, c.apiKey)
+
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	return userID, nil
 }

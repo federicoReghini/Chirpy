@@ -85,6 +85,7 @@ func main() {
 	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "chirps"), apiCfg.handlerCreateChirp)
 	serveMux.HandleFunc(createApiPath("GET ", apiPrefix, "chirps"), apiCfg.handlerGetChips)
 	serveMux.HandleFunc(createApiPath("GET ", apiPrefix, "chirps/{chirpID}"), apiCfg.handlerGetChipByID)
+	serveMux.HandleFunc(createApiPath("DELETE ", apiPrefix, "chirps/{chirpID}"), apiCfg.handlerDeleteChirp)
 	// Users resource
 	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "users"), apiCfg.handlerCreateUser)
 	serveMux.HandleFunc(createApiPath("PUT ", apiPrefix, "users"), apiCfg.handlerUpdateUser)
