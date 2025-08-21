@@ -15,3 +15,10 @@ WHERE users.email = $1;
 
 -- name: DeleteUsers :exec
 DELETE FROM users;
+
+-- name: GetUserFromRefreshToken :one
+SELECT * FROM users 
+WHERE users.id = (
+  SELECT user_id FROM refresh_tokens
+  WHERE refresh_tokens.token = $1
+);

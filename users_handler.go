@@ -57,17 +57,17 @@ func (c *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request) 
 }
 
 type loginRequest struct {
-	Password         string `json:"password"`
-	Email            string `json:"email"`
-	ExpiresInSeconds int    `json:"expires_in_seconds:omitempty"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
 }
 
 type UserWithToken struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
-	Token     string    `json:"token"`
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
 }
 
 // handlerLogin handles user login requests.
@@ -96,26 +96,98 @@ func (c *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if params.ExpiresInSeconds == 0 || params.ExpiresInSeconds > 60*60 {
-		params.ExpiresInSeconds = 60 * 60
-	}
-
 	// Create Jwt
-	token, err := auth.MakeJWT(user.ID, c.apiKey, time.Duration(params.ExpiresInSeconds)*time.Second)
+	token, err := auth.MakeJWT(user.ID, c.apiKey, time.Duration(60*60)*time.Second)
 
 	if err != nil {
 		marshalError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
+	// Create refresh token
+	refreshToken, err := auth.MakeRefreshToken()
+
+	if err != nil {
+		marshalError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.db.CreateRefreshToken(req.Context(), database.CreateRefreshTokenParams{
+		Token: refreshToken,
+		UserID: uuid.NullUUID{
+			UUID:  user.ID,
+			Valid: true,
+		},
+		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
+	})
+
 	usr := UserWithToken{
-		ID:        user.ID,
-		Email:     user.Email,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Token:     token,
+		ID:           user.ID,
+		Email:        user.Email,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
+		Token:        token,
+		RefreshToken: refreshToken,
 	}
 
 	marshalOkJson(w, http.StatusOK, usr)
+
+}
+
+type token struct {
+	Token string `json:"token"`
+}
+
+// handlerRefreshToken handles requests to refresh the JWT token using a refresh token.
+// It checks the validity of the refresh token and returns a new JWT token if valid.
+func (c *apiConfig) handlerRefreshToken(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
+
+	refreshToken, err := auth.GetBearerToken(req.Header)
+
+	if err != nil {
+		marshalError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Check if the refresh token is valid
+	refreshTokenRecord, err := c.db.GetRefreshTokenByToken(req.Context(), refreshToken)
+
+	if err != nil {
+		marshalError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	if refreshTokenRecord.RevokedAt.Valid || refreshTokenRecord.ExpiresAt.Before(time.Now()) {
+		marshalError(w, http.StatusUnauthorized, "Refresh token expired")
+		return
+	}
+
+	tkn, err := auth.MakeJWT(refreshTokenRecord.UserID.UUID, c.apiKey, time.Duration(60*60)*time.Second)
+	if err != nil {
+		marshalError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	marshalOkJson(w, http.StatusOK, token{
+		Token: tkn,
+	})
+
+}
+
+func (c *apiConfig) handlerRefreshTokenRevoke(w http.ResponseWriter, req *http.Request) {
+
+	defer req.Body.Close()
+
+	refreshToken, err := auth.GetBearerToken(req.Header)
+
+	if err != nil {
+		marshalError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	c.db.RevokeRefreshToken(req.Context(), refreshToken)
+
+	w.WriteHeader(http.StatusNoContent)
 
 }
