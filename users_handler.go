@@ -56,6 +56,62 @@ func (c *apiConfig) handlerCreateUser(w http.ResponseWriter, req *http.Request) 
 	w.Write(dat)
 }
 
+func (c *apiConfig) handlerUpdateUser(w http.ResponseWriter, req *http.Request) {
+	defer req.Body.Close()
+
+	// Get user from JWT token (reuse auth logic)
+	token, err := auth.GetBearerToken(req.Header)
+	if err != nil {
+		marshalError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, c.apiKey)
+	if err != nil {
+		marshalError(w, http.StatusUnauthorized, "Invalid token")
+		return
+	}
+
+	// Reuse the same request struct as createUser
+	params := createUserBodyRequest{}
+	decoder := json.NewDecoder(req.Body)
+	err = decoder.Decode(&params)
+	if err != nil {
+		marshalError(w, http.StatusInternalServerError, "Something went wrong")
+		return
+	}
+
+	// Reuse password hashing logic from createUser
+	params.Password, err = auth.HashPassword(params.Password)
+	if err != nil {
+		marshalError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Update user with same parameter structure
+	user, err := c.db.UpdateUser(req.Context(), database.UpdateUserParams{
+		ID:             userID,
+		Email:          params.Email,
+		HashedPassword: params.Password,
+	})
+
+	if err != nil {
+		marshalError(w, 500, "update user error: "+err.Error())
+		return
+	}
+
+	// Reuse the same marshaling logic from createUser
+	dat, err := json.Marshal(user)
+	if err != nil {
+		marshalError(w, 500, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	w.Write(dat)
+}
+
 type loginRequest struct {
 	Password string `json:"password"`
 	Email    string `json:"email"`
@@ -80,7 +136,7 @@ func (c *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 	decoder := json.NewDecoder(req.Body)
 
 	if err := decoder.Decode(&params); err != nil {
-		marshalError(w, http.StatusInternalServerError, "Something went wrong while decoding")
+		marshalError(w, http.StatusInternalServerError, "Something went wrong while decoding: "+err.Error())
 		return
 	}
 

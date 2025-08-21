@@ -87,6 +87,7 @@ func main() {
 	serveMux.HandleFunc(createApiPath("GET ", apiPrefix, "chirps/{chirpID}"), apiCfg.handlerGetChipByID)
 	// Users resource
 	serveMux.HandleFunc(createApiPath("POST ", apiPrefix, "users"), apiCfg.handlerCreateUser)
+	serveMux.HandleFunc(createApiPath("PUT ", apiPrefix, "users"), apiCfg.handlerUpdateUser)
 	serveMux.HandleFunc(createApiPath("POST ", adminPrefix, "reset"), apiCfg.handlerReset)
 
 	server := &http.Server{

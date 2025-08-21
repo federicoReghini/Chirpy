@@ -22,3 +22,9 @@ WHERE users.id = (
   SELECT user_id FROM refresh_tokens
   WHERE refresh_tokens.token = $1
 );
+
+-- name: UpdateUser :one
+UPDATE users
+  SET email = $1, hashed_password = $2
+  WHERE users.id = $3
+  RETURNING *;
