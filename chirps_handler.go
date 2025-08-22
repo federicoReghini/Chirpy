@@ -50,7 +50,32 @@ func (c *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Request)
 func (c *apiConfig) handlerGetChips(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
-	chirps, err := c.db.GetChirps(req.Context())
+	dbChirps, err := c.db.GetChirps(req.Context())
+
+	authorID := uuid.Nil
+	authorIDString := req.URL.Query().Get("author_id")
+	if authorIDString != "" {
+		authorID, err = uuid.Parse(authorIDString)
+		if err != nil {
+			marshalError(w, http.StatusBadRequest, "Invalid author ID")
+			return
+		}
+	}
+
+	chirps := []database.Chirp{}
+	for _, dbChirp := range dbChirps {
+		if authorID != uuid.Nil && dbChirp.UserID.UUID != authorID {
+			continue
+		}
+
+		chirps = append(chirps, database.Chirp{
+			ID:        dbChirp.ID,
+			CreatedAt: dbChirp.CreatedAt,
+			UpdatedAt: dbChirp.UpdatedAt,
+			UserID:    dbChirp.UserID,
+			Body:      dbChirp.Body,
+		})
+	}
 
 	if err != nil {
 		marshalError(w, http.StatusInternalServerError, err.Error())
