@@ -50,7 +50,11 @@ func (c *apiConfig) handlerCreateChirp(w http.ResponseWriter, req *http.Request)
 func (c *apiConfig) handlerGetChips(w http.ResponseWriter, req *http.Request) {
 	defer req.Body.Close()
 
-	dbChirps, err := c.db.GetChirps(req.Context())
+	sort := req.URL.Query().Get("sort")
+	if sort == "" {
+		sort = "asc"
+	}
+	dbChirps, err := c.db.GetChirps(req.Context(), sort)
 
 	authorID := uuid.Nil
 	authorIDString := req.URL.Query().Get("author_id")
